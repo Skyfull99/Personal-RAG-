@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alta Tecnologia RAG Local</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <div class="app">
+
+        <!-- Barra lateral: lista de chats guardados -->
+        <aside class="barra-lateral">
+            <button id="btn-nuevo-chat" class="btn-nuevo-chat">+ Nuevo chat</button>
+            <div id="lista-chats" class="lista-chats">
+                <!-- Los chats guardados se insertan aqui por JS -->
+            </div>
+        </aside>
+
+        <!-- Area principal de conversacion -->
+        <main class="principal">
+
+            <header class="encabezado">
+                <span class="titulo">RAG Local</span>
+                <button id="btn-tema" class="btn-tema" title="Cambiar tema claro/oscuro">🌓</button>
+            </header>
+
+            <div id="mensajes" class="mensajes">
+                <p class="placeholder">Selecciona un chat de la izquierda o crea uno nuevo para empezar.</p>
+            </div>
+
+            <form id="form-mensaje" class="form-mensaje">
+                <textarea
+                    id="entrada"
+                    placeholder="Escribe tu pregunta... (Ctrl+Enter para enviar)"
+                    rows="1"
+                ></textarea>
+                <button id="btn-enviar" type="submit">Enviar</button>
+            </form>
+
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

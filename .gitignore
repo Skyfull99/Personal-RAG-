@@ -1,0 +1,30 @@
+# === Entornos virtuales (se recrean con Requirements.txt) ===
+env/
+.venv/
+venv/
+
+# === Secretos y configuracion local ===
+.env
+.claude/settings.local.json
+
+# === Datos: documentos de la empresa y bases generadas ===
+# Los documentos fuente son informacion de la empresa; la base vectorial
+# y los chats se regeneran/crean localmente. Nada de esto se versiona.
+datos/
+Agentes/mi_base_vectorial/
+web/*.db
+web/*.db-journal
+
+# === Documentacion interna (planes, diagramas) — privada, fuera del repo ===
+docs/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# === Sistema operativo / editores ===
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,28 @@
+# Interfaz de comunicación con Ollama
+ollama
+
+# Framework de orquestación RAG
+langchain
+langchain-community
+langchain-ollama
+langchain-text-splitters
+
+# Base de datos vectorial local (ligera y en memoria)
+chromadb
+
+# Procesamiento y lectura de documentos PDF
+pypdf
+
+# Búsqueda léxica BM25 (usada en rag_agent.py para la busqueda hibrida)
+rank_bm25
+
+# Cross-encoder para re-ranking de precision (segunda etapa de retrieval,
+# usada en rag_agent.py -> CrossEncoderReranker). Instala tambien torch
+# como dependencia (descarga puede ser pesada, ~1-2 GB la primera vez).
+sentence-transformers
+
+# Carga del archivo .env (usada en rag_agent.py y orquestador_core.py)
+python-dotenv
+
+# Trazado / observabilidad de LLM (Datadog) - usada en rag_agent.py y orquestador_core.py
+ddtrace

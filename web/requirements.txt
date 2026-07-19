@@ -1,0 +1,25 @@
+# Dependencias para la capa web
+
+# Framework para crear APIs y servidor web
+fastapi
+
+# Servidor ASGI que ejecuta FastAPI (el "motor" que escucha peticiones)
+# [standard] incluye extras utiles como reload automatico
+uvicorn[standard]
+
+# Motor de plantillas para renderizar HTML desde Python
+jinja2
+
+# --- A partir de aqui: lo que necesita rag_service.py para importar y ---
+# --- correr Agentes/rag_agent.py directamente desde este servidor web. ---
+# Si ya instalaste Agentes/Requirements.txt en este mismo entorno (env),
+# estas ya estan instaladas y pip simplemente las vera satisfechas.
+ollama
+langchain
+langchain-community
+langchain-ollama
+chromadb
+rank_bm25
+python-dotenv
+ddtrace
+sentence-transformers
