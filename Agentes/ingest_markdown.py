@@ -100,6 +100,13 @@ class IngestManifest:
             with open(self.path, "r", encoding="utf-8") as f:
                 self._data = json.load(f)
             print(f"[OK] Manifest cargado: {len(self._data)} archivo(s) ya ingestados.")
+            # Formato viejo: claves sin prefijo de carpeta ("doc.md" en vez
+            # de "archivos-alta/doc.md"). Esas entradas ya no matchean nada,
+            # asi que todo se veria como "nuevo" y quedarian chunks huerfanos
+            # con IDs del esquema anterior. La salida limpia es --rebuild.
+            if any("/" not in clave for clave in self._data):
+                print("[WARN] El manifest usa el formato viejo (sin carpeta en la clave).")
+                print("       Se recomienda regenerar la base con: python ingest_markdown.py --rebuild")
         else:
             print("[INFO] No hay manifest previo: se creara uno nuevo (primera ingesta incremental).")
 
@@ -339,15 +346,23 @@ class DirectoryLoader:
         self.directory_paths = [Path(p) for p in directory_paths]
         self.extension = extension
 
-    def discover_files(self) -> List[Path]:
-        archivos: List[Path] = []
+    def discover_files(self) -> List[tuple]:
+        """Devuelve pares (clave, ruta) por archivo encontrado.
+
+        La clave es "carpeta-fuente/nombre-archivo" (p.ej.
+        "archivos-alta/contrato.md"): es lo que usa el manifest y el
+        prefijo de los IDs de chunks. Sin el prefijo de carpeta, dos
+        fuentes con un archivo del mismo nombre se pisarian mutuamente
+        en el manifest y en la base (el segundo borraria al primero).
+        """
+        archivos: List[tuple] = []
         for directory_path in self.directory_paths:
             if not directory_path.exists():
                 print(f"[WARN] Carpeta no encontrada, se omite: {directory_path}")
                 continue
             encontrados = sorted(directory_path.glob(f"*{self.extension}"))
             print(f"[INFO] {len(encontrados)} archivo(s) {self.extension} en: {directory_path}")
-            archivos.extend(encontrados)
+            archivos.extend((f"{directory_path.name}/{p.name}", p) for p in encontrados)
 
         if not archivos:
             raise FileNotFoundError(
@@ -391,10 +406,9 @@ class IngestionPipeline:
         nuevos = 0
         reingestados = 0
 
-        for file_path in archivos:
-            filename = file_path.name
+        for clave, file_path in archivos:
             stat = file_path.stat()
-            entry = self.manifest.get(filename)
+            entry = self.manifest.get(clave)
 
             # Chequeo rapido: si fecha de modificacion y tamaño no cambiaron
             # desde la ultima ingesta, se salta sin ni siquiera leer el archivo.
@@ -410,28 +424,28 @@ class IngestionPipeline:
                 # manifest para que el chequeo rapido funcione la proxima vez.
                 entry["mtime"] = stat.st_mtime
                 entry["size"] = stat.st_size
-                self.manifest.update(filename, entry)
+                self.manifest.update(clave, entry)
                 self.manifest.save()
                 sin_cambios += 1
                 continue
 
             if entry:
-                print(f"\n[DOC] Modificado, re-ingestando: {filename}")
+                print(f"\n[DOC] Modificado, re-ingestando: {clave}")
                 reingestados += 1
             else:
-                print(f"\n[DOC] Nuevo, ingestando: {filename}")
+                print(f"\n[DOC] Nuevo, ingestando: {clave}")
                 nuevos += 1
 
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            self._ingest_file(filename, content, file_hash, stat)
+            self._ingest_file(clave, content, file_hash, stat)
 
         self._report_orphans(archivos, prune)
 
         print(f"\n[STATS] {nuevos} nuevo(s) | {reingestados} re-ingestado(s) | {sin_cambios} sin cambios (saltados).")
         print(f"[OK] Ingesta completada. Tiempo: {time.time() - start_time:.2f}s")
 
-    def _ingest_file(self, filename: str, content: str, file_hash: str, stat) -> None:
+    def _ingest_file(self, clave: str, content: str, file_hash: str, stat) -> None:
         """Procesa UN archivo completo y deja base + stores consistentes.
 
         El orden importa para la robustez ante cortes:
@@ -443,11 +457,15 @@ class IngestionPipeline:
         corrida detecta el hash distinto y lo re-ingesta desde cero. Los
         demas archivos nunca se ven afectados.
         """
-        entry_previa = self.manifest.get(filename)
+        entry_previa = self.manifest.get(clave)
         if entry_previa:
             self.db_manager.delete_ids(entry_previa.get("child_ids", []))
             self.parent_store.remove_many(entry_previa.get("parent_ids", []))
 
+        # La clave viene como "carpeta-fuente/archivo.md". La carpeta prefija
+        # los IDs (unicidad entre fuentes); el nombre alimenta el "source"
+        # legible que se le muestra al usuario en las citas.
+        carpeta, filename = clave.split("/", 1)
         clean_source = filename.replace("_Markdown.md", "").replace("_", " ")
 
         global_keywords = self.enricher.extract_global_keywords(content)
@@ -460,12 +478,12 @@ class IngestionPipeline:
         parent_ids: List[str] = []
 
         for p_idx, parent in enumerate(parent_docs):
-            parent_id = f"{Path(filename).stem}_p{p_idx}"
+            parent_id = f"{carpeta}/{Path(filename).stem}_p{p_idx}"
             topic = parent.metadata.get("Contexto_Semantico", "General")
 
             self.parent_store.add(parent_id, parent.page_content, {
                 "source": clean_source,
-                "source_file": filename,
+                "source_file": clave,
                 "topic": topic,
                 "global_keywords": global_keywords,
                 "parent_index": p_idx,
@@ -491,7 +509,7 @@ class IngestionPipeline:
                     "content": enriched_text,
                     "metadata": {
                         "source": clean_source,
-                        "source_file": filename,
+                        "source_file": clave,
                         "topic": topic,
                         "global_keywords": global_keywords,
                         "parent_id": parent_id,
@@ -516,7 +534,7 @@ class IngestionPipeline:
         # stores. Guardar por archivo (y no al final de todo) hace que un
         # corte solo pierda el archivo en curso, nunca lo ya procesado.
         self.parent_store.save()
-        self.manifest.update(filename, {
+        self.manifest.update(clave, {
             "sha256": file_hash,
             "mtime": stat.st_mtime,
             "size": stat.st_size,
@@ -525,7 +543,7 @@ class IngestionPipeline:
             "child_ids": [c["id"] for c in children_del_archivo],
         })
         self.manifest.save()
-        print(f"   [OK] {filename}: {len(parent_ids)} parents / {len(children_del_archivo)} children guardados.")
+        print(f"   [OK] {clave}: {len(parent_ids)} parents / {len(children_del_archivo)} children guardados.")
 
     def _report_orphans(self, archivos_presentes: List[Path], prune: bool) -> None:
         """Detecta archivos que estan en el manifest pero ya no en las carpetas.
@@ -535,7 +553,7 @@ class IngestionPipeline:
         automaticamente destruiria conocimiento valido. Con --prune se
         eliminan de verdad (chunks, parents y entrada del manifest).
         """
-        presentes = {p.name for p in archivos_presentes}
+        presentes = {clave for clave, _ in archivos_presentes}
         huerfanos = [f for f in self.manifest.filenames() if f not in presentes]
         if not huerfanos:
             return
