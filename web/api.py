@@ -4,6 +4,12 @@ Aqui van todos los endpoints que el frontend (navegador) llama, bajo el
 prefijo /api (ver main.py). Todo lo relacionado a chats se guarda en
 SQLite (chat_store.py) y las respuestas las genera el motor RAG real
 (rag_service.py, que envuelve a Agentes/rag_agent.py).
+
+PENDIENTE IMPORTANTE: no hay autenticacion — cualquiera con acceso de red
+puede leer y borrar chats. El plan (docs/Fase1): concentrar la identidad
+en una dependencia get_current_user() que usen todos los endpoints; en
+Fase 2 esa misma funcion se reimplementa leyendo los headers de Entra ID
+(Easy Auth de Azure) sin tocar ningun endpoint.
 """
 
 import json

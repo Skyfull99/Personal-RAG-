@@ -24,6 +24,16 @@ _RAIZ_PROYECTO = _BASE_DIR.parent                  # .../IAPY
 
 @dataclass
 class IngestionConfig:
+    """Toda la configuracion de la ingesta en un solo lugar.
+
+    Si hay que cambiar rutas, modelos o tamaños de chunk, se cambia aqui
+    y en ningun otro lado. Los defaults estan pensados para correr en
+    local tal cual esta.
+
+    AZURE (Fase 1): esta clase pasa a construirse desde variables de
+    entorno (pydantic-settings) en vez de defaults fijos, para que el
+    mismo codigo corra en local, Docker y la nube sin tocarlo.
+    """
     db_path: str = str(_BASE_DIR / "mi_base_vectorial")
     collection_name: str = "mis_videos_estructurados"
     parent_store_path: str = str(_BASE_DIR / "mi_base_vectorial" / "parent_store.json")
@@ -78,6 +88,10 @@ class IngestManifest:
       - parent_ids / child_ids: los IDs exactos que este archivo dejo en el
                     parent store y en ChromaDB, para poder borrarlos de forma
                     quirurgica cuando el archivo cambie o se elimine.
+
+    AZURE: este manifest se queda tal cual en todas las fases — es lo que
+    hace idempotente la ingesta por eventos (un evento duplicado de Event
+    Grid no duplica chunks, un reintento no rompe nada).
     """
     def __init__(self, path: Path):
         self.path = path
@@ -132,7 +146,17 @@ class ParentStore:
 
 
 class MetadataEnricher:
-    """Responsabilidad: extraer keywords globales del documento (expande acronimos)."""
+    """Extrae las keywords globales de un documento usando el LLM local.
+
+    La gracia: las keywords se prependen a cada chunk antes de vectorizar,
+    asi un chunk que habla de "el sistema" en abstracto igual matchea
+    consultas sobre el tema real del documento. La regla de expandir
+    acronimos (RAG -> Retrieval Augmented Generation) existe porque los
+    usuarios preguntan de ambas formas.
+
+    AZURE (Fase 3): la llamada a ollama.chat se cambia por Azure OpenAI
+    (GPT-4o-mini alcanza de sobra para esta tarea).
+    """
     def __init__(self, model_name: str):
         self.model_name = model_name
         self.options = {"temperature": 0.0, "num_ctx": 4096}
@@ -231,6 +255,10 @@ class VectorDBManager:
     fallo a mitad de ingesta dejaba la base vacia). Ahora la coleccion se
     abre tal cual esta y solo se tocan los chunks del archivo que se esta
     (re)ingestando. El borrado total solo ocurre con --rebuild explicito.
+
+    AZURE (Fase 3): esta clase es la costura para Azure AI Search — misma
+    interfaz (upsert_batch / delete_ids), otro backend. El resto del
+    pipeline no deberia enterarse del cambio.
     """
     # Metrica de distancia explicita. Chroma usa L2 por defecto si no se
     # especifica; para embeddings de texto como nomic-embed-text el estandar
@@ -297,7 +325,16 @@ class ParentChildChunker:
 
 
 class DirectoryLoader:
-    """Descubre archivos .md en una o varias carpetas fuente."""
+    """Descubre los .md en las carpetas fuente configuradas.
+
+    Solo lista archivos; leerlos es responsabilidad del pipeline (asi el
+    chequeo incremental puede saltarse un archivo sin abrirlo siquiera).
+
+    AZURE (Fase 2): los documentos viven en Blob Storage; antes de correr
+    la ingesta se sincronizan a una carpeta local (azcopy sync o el SDK)
+    y esta clase sigue funcionando igual. En Fase 3 desaparece el "scan":
+    Event Grid avisa archivo por archivo al subirse un blob.
+    """
     def __init__(self, directory_paths: List[str], extension: str = ".md"):
         self.directory_paths = [Path(p) for p in directory_paths]
         self.extension = extension
@@ -320,6 +357,17 @@ class DirectoryLoader:
 
 
 class IngestionPipeline:
+    """Orquesta la ingesta completa: descubrir -> decidir -> procesar -> guardar.
+
+    El flujo por archivo esta en _ingest_file(); run() solo decide QUE
+    archivos tocar (via el manifest) y reporta. Mantener esa separacion:
+    es lo que permite que en Fase 3 un evento de Blob llame directo a la
+    logica de un archivo sin pasar por el scan de carpetas.
+
+    AZURE: chromadb -> Azure AI Search (Fase 3) via VectorDBManager;
+    OllamaEmbeddings -> text-embedding-3 (ojo: cambiar de modelo de
+    embeddings obliga a re-vectorizar TODO el corpus con --rebuild).
+    """
     def __init__(self, config: IngestionConfig):
         self.config = config
         self.db_manager = VectorDBManager(config.db_path, config.collection_name)

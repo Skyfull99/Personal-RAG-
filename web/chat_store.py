@@ -1,7 +1,17 @@
 """Guardado de chats en SQLite.
 
-Muy basico a proposito: dos tablas (chats y mensajes), sin ORM.
-La base vive en web/chats.db y se crea sola la primera vez que se usa.
+Muy basico a proposito: dos tablas (chats y mensajes), sin ORM, todo el
+SQL a la vista. La base (conversaciones.db) se crea sola al primer uso.
+
+Este modulo es la UNICA puerta a la base — nadie mas ejecuta SQL. Esa
+disciplina es lo que hace barata la migracion:
+
+AZURE (Fase 2): sqlite3 -> PostgreSQL Flexible Server. Cambios acotados
+a este archivo: psycopg en vez de sqlite3, placeholders %s en vez de ?,
+y la cadena de conexion por variable de entorno (con sslmode=require).
+El resto del SQL es estandar y migra tal cual.
+AZURE (Fase 1, antes de eso): agregar tabla usuarios y columna user_id
+en chats para el multiusuario.
 """
 
 import sqlite3
@@ -58,6 +68,7 @@ def iniciar_db() -> None:
 
 
 def crear_chat(titulo: str = "Nuevo chat") -> Dict[str, Any]:
+    """Crea un chat vacio y devuelve su fila completa (la GUI la pinta directo)."""
     chat_id = str(uuid.uuid4())
     creado_en = datetime.now().isoformat(timespec="seconds")
     con = _conectar()

@@ -33,6 +33,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ---------- Lista de chats guardados ----------
 
+    // Repinta la barra lateral completa desde el servidor. Se llama al
+    // arrancar y despues de cualquier cambio (crear, borrar, renombrar,
+    // primer mensaje que auto-titula). Repintar todo es mas simple que
+    // sincronizar el DOM a mano, y con decenas de chats no se nota.
     async function cargarListaChats() {
         const resp = await fetch("/api/chats");
         const chats = await resp.json();
@@ -145,6 +149,8 @@ document.addEventListener("DOMContentLoaded", () => {
         await cargarListaChats();
     }
 
+    // Abre un chat: trae su historial completo y lo pinta. El boton de
+    // editar solo se coloca al final, cuando ya existe el ultimo mensaje.
     async function seleccionarChat(chatId) {
         chatActualId = chatId;
         await cargarListaChats();

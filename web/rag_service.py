@@ -13,6 +13,8 @@ from typing import Dict, Iterator, List
 
 # Agentes/ vive al lado de web/. Lo agregamos al sys.path para poder
 # reutilizar las clases de rag_agent.py sin duplicar codigo.
+# AZURE (Fase 1): este hack desaparece al empaquetar el proyecto — con
+# pyproject.toml el import pasa a ser "from iapy_rag.agents import ...".
 AGENTES_DIR = Path(__file__).resolve().parent.parent / "Agentes"
 if str(AGENTES_DIR) not in sys.path:
     sys.path.insert(0, str(AGENTES_DIR))
