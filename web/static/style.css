@@ -195,6 +195,27 @@ body {
 .encabezado .titulo {
     font-weight: 600;
     font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+}
+
+/* Logo de marca en el encabezado: hay dos versiones del PNG y el tema
+   decide cual se muestra (la blanca solo se ve sobre fondo oscuro). */
+.encabezado .logo {
+    height: 40px;
+    display: block;
+}
+
+.encabezado .logo-noche {
+    display: none;
+}
+
+body.tema-oscuro .encabezado .logo-dia {
+    display: none;
+}
+
+body.tema-oscuro .encabezado .logo-noche {
+    display: block;
 }
 
 .btn-tema {

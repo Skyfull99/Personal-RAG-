@@ -18,6 +18,10 @@ web/*.db-journal
 # === Documentacion interna (planes, diagramas) — privada, fuera del repo ===
 docs/
 
+# === Originales de diseño (los logos servibles viven en web/static/img/) ===
+# La barra inicial ancla la regla a la raiz: web/static/img SI se versiona.
+/img/
+
 # === Python ===
 __pycache__/
 *.py[cod]
