@@ -11,8 +11,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const formMensaje = document.getElementById("form-mensaje");
     const entrada = document.getElementById("entrada");
     const btnEnviar = document.getElementById("btn-enviar");
+    const btnSalir = document.getElementById("btn-salir");
+    const btnAdmin = document.getElementById("btn-admin");
+    const usuarioNombre = document.getElementById("usuario-nombre");
+    const usuarioRol = document.getElementById("usuario-rol");
 
     let chatActualId = null;
+
+    // Si el servidor responde 401 (sesion expirada o cerrada en otra
+    // pestaña), volvemos al login. Devuelve true si redirigio, para que
+    // el que llamo pueda cortar el flujo.
+    function siNoAutenticado(resp) {
+        if (resp.status === 401) {
+            window.location.href = "/login";
+            return true;
+        }
+        return false;
+    }
 
     // ---------- Tema claro/oscuro ----------
 
@@ -39,6 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // sincronizar el DOM a mano, y con decenas de chats no se nota.
     async function cargarListaChats() {
         const resp = await fetch("/api/chats");
+        if (siNoAutenticado(resp)) return;
         const chats = await resp.json();
 
         listaChats.innerHTML = "";
@@ -508,6 +524,132 @@ document.addEventListener("DOMContentLoaded", () => {
         entrada.style.height = Math.min(entrada.scrollHeight, 160) + "px";
     });
 
+    // ---------- Sesión de usuario ----------
+
+    // Carga los datos del usuario logueado y adapta la interfaz (nombre,
+    // rol, boton de admin). Si no hay sesion valida, vuelve al login.
+    async function cargarUsuario() {
+        const resp = await fetch("/api/auth/me");
+        if (siNoAutenticado(resp)) return null;
+        const usuario = await resp.json();
+        usuarioNombre.textContent = usuario.nombre;
+        usuarioRol.textContent = usuario.rol === "admin" ? "Administrador" : "Usuario";
+        // El boton (y todo el panel) de administracion solo existe para admins.
+        // Nota: el backend igual valida el rol en cada endpoint /admin, esto
+        // es solo para no mostrar lo que no aplica.
+        if (usuario.rol === "admin") {
+            btnAdmin.hidden = false;
+        }
+        return usuario;
+    }
+
+    async function cerrarSesion() {
+        await fetch("/api/auth/logout", { method: "POST" });
+        window.location.href = "/login";
+    }
+
+    btnSalir.addEventListener("click", cerrarSesion);
+
+    // ---------- Panel de administración de usuarios (solo admins) ----------
+
+    const modalAdmin = document.getElementById("modal-admin");
+    const tablaUsuariosBody = document.getElementById("tabla-usuarios-body");
+    const btnCerrarAdmin = document.getElementById("btn-cerrar-admin");
+    const btnCrearUsuario = document.getElementById("btn-crear-usuario");
+    const errorCrearUsuario = document.getElementById("error-crear-usuario");
+
+    function escaparTexto(t) {
+        const div = document.createElement("div");
+        div.textContent = t;
+        return div.innerHTML;
+    }
+
+    async function cargarUsuarios() {
+        const resp = await fetch("/api/admin/usuarios");
+        if (siNoAutenticado(resp)) return;
+        const usuarios = await resp.json();
+
+        tablaUsuariosBody.innerHTML = "";
+        for (const u of usuarios) {
+            const tr = document.createElement("tr");
+            const badge = u.rol === "admin"
+                ? '<span class="badge-rol admin">Admin</span>'
+                : '<span class="badge-rol usuario">Usuario</span>';
+            tr.innerHTML = `
+                <td>${escaparTexto(u.nombre)}</td>
+                <td>${escaparTexto(u.email)}</td>
+                <td>${badge}</td>
+                <td><button class="btn-borrar-usuario" title="Eliminar" data-id="${u.id}">×</button></td>`;
+            tablaUsuariosBody.appendChild(tr);
+        }
+        // Enganchamos los botones de borrar tras pintarlos.
+        tablaUsuariosBody.querySelectorAll(".btn-borrar-usuario").forEach((btn) => {
+            btn.addEventListener("click", () => eliminarUsuario(btn.dataset.id));
+        });
+    }
+
+    async function eliminarUsuario(userId) {
+        if (!confirm("¿Eliminar este usuario y todos sus chats? No se puede deshacer.")) return;
+        const resp = await fetch(`/api/admin/usuarios/${userId}`, { method: "DELETE" });
+        if (siNoAutenticado(resp)) return;
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            alert(err.detail || "No se pudo eliminar el usuario");
+            return;
+        }
+        await cargarUsuarios();
+    }
+
+    async function crearUsuario() {
+        errorCrearUsuario.hidden = true;
+        const datos = {
+            nombre: document.getElementById("nuevo-nombre").value.trim(),
+            email: document.getElementById("nuevo-email").value.trim(),
+            password: document.getElementById("nuevo-password").value,
+            rol: document.getElementById("nuevo-rol").value,
+        };
+        if (!datos.nombre || !datos.email || !datos.password) {
+            errorCrearUsuario.textContent = "Completa todos los campos.";
+            errorCrearUsuario.hidden = false;
+            return;
+        }
+        const resp = await fetch("/api/admin/usuarios", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(datos),
+        });
+        if (siNoAutenticado(resp)) return;
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            errorCrearUsuario.textContent = err.detail || "No se pudo crear el usuario";
+            errorCrearUsuario.hidden = false;
+            return;
+        }
+        // Limpiar el formulario y refrescar la tabla.
+        document.getElementById("nuevo-nombre").value = "";
+        document.getElementById("nuevo-email").value = "";
+        document.getElementById("nuevo-password").value = "";
+        document.getElementById("nuevo-rol").value = "usuario";
+        await cargarUsuarios();
+    }
+
+    function abrirModalAdmin() {
+        modalAdmin.hidden = false;
+        cargarUsuarios();
+    }
+
+    btnAdmin.addEventListener("click", abrirModalAdmin);
+    btnCerrarAdmin.addEventListener("click", () => { modalAdmin.hidden = true; });
+    modalAdmin.addEventListener("click", (e) => {
+        if (e.target === modalAdmin) modalAdmin.hidden = true;  // clic fuera cierra
+    });
+    btnCrearUsuario.addEventListener("click", crearUsuario);
+
     // ---------- Arranque ----------
-    cargarListaChats();
+    // Primero verificamos la sesion (si no hay, cargarUsuario redirige al
+    // login); solo si hay usuario cargamos sus chats.
+    (async () => {
+        const usuario = await cargarUsuario();
+        if (usuario) await cargarListaChats();
+    })();
 });

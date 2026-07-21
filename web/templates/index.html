@@ -29,7 +29,16 @@
                     <img src="/static/img/logo-dia.png" alt="Alta Tecnologia" class="logo logo-dia">
                     <img src="/static/img/logo-noche.png" alt="Alta Tecnologia" class="logo logo-noche">
                 </span>
-                <button id="btn-tema" class="btn-tema" title="Cambiar tema claro/oscuro">🌓</button>
+                <div class="encabezado-controles">
+                    <div class="usuario-info">
+                        <span id="usuario-nombre" class="usuario-nombre"></span>
+                        <span id="usuario-rol" class="usuario-rol"></span>
+                    </div>
+                    <!-- Solo visible para admins (lo muestra app.js) -->
+                    <button id="btn-admin" class="btn-admin" title="Administrar usuarios" hidden>Usuarios</button>
+                    <button id="btn-tema" class="btn-tema" title="Cambiar tema claro/oscuro">🌓</button>
+                    <button id="btn-salir" class="btn-salir" title="Cerrar sesión">Salir</button>
+                </div>
             </header>
 
             <div id="mensajes" class="mensajes">
@@ -46,6 +55,42 @@
             </form>
 
         </main>
+    </div>
+
+    <!-- Modal de administración de usuarios (solo admins). app.js lo llena. -->
+    <div id="modal-admin" class="modal-fondo" hidden>
+        <div class="modal-caja">
+            <div class="modal-titulo">
+                <h2>Administración de usuarios</h2>
+                <button id="btn-cerrar-admin" class="modal-cerrar" title="Cerrar">×</button>
+            </div>
+
+            <table class="tabla-usuarios">
+                <thead>
+                    <tr>
+                        <th>Nombre</th><th>Correo</th><th>Rol</th><th></th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-usuarios-body"></tbody>
+            </table>
+
+            <div class="form-nuevo-usuario">
+                <h3>Crear usuario nuevo</h3>
+                <div class="fila-campos">
+                    <input id="nuevo-nombre" type="text" placeholder="Nombre">
+                    <input id="nuevo-email" type="email" placeholder="Correo">
+                </div>
+                <div class="fila-campos">
+                    <input id="nuevo-password" type="password" placeholder="Contraseña (mín. 8)">
+                    <select id="nuevo-rol">
+                        <option value="usuario">Usuario</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+                <button id="btn-crear-usuario" class="btn-crear-usuario">Crear usuario</button>
+                <p id="error-crear-usuario" class="error-usuario" hidden></p>
+            </div>
+        </div>
     </div>
 
     <script src="/static/app.js"></script>

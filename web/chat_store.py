@@ -43,6 +43,18 @@ def iniciar_db() -> None:
     try:
         con.execute(
             """
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id TEXT PRIMARY KEY,
+                email TEXT NOT NULL UNIQUE,
+                nombre TEXT NOT NULL,
+                hash_password TEXT NOT NULL,
+                rol TEXT NOT NULL DEFAULT 'usuario',
+                creado_en TEXT NOT NULL
+            )
+            """
+        )
+        con.execute(
+            """
             CREATE TABLE IF NOT EXISTS chats (
                 id TEXT PRIMARY KEY,
                 titulo TEXT NOT NULL,
@@ -50,6 +62,13 @@ def iniciar_db() -> None:
             )
             """
         )
+        # Migracion suave: las bases creadas antes del multiusuario no
+        # tienen user_id en chats. Se agrega la columna sin tocar datos;
+        # los chats viejos quedan con NULL hasta que un admin los adopte
+        # (ver adoptar_chats_sin_usuario, la usa crear_usuario.py).
+        columnas = [c[1] for c in con.execute("PRAGMA table_info(chats)")]
+        if "user_id" not in columnas:
+            con.execute("ALTER TABLE chats ADD COLUMN user_id TEXT")
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS mensajes (
@@ -67,15 +86,133 @@ def iniciar_db() -> None:
         con.close()
 
 
-def crear_chat(titulo: str = "Nuevo chat") -> Dict[str, Any]:
-    """Crea un chat vacio y devuelve su fila completa (la GUI la pinta directo)."""
+# ==========================================================================
+# USUARIOS
+# ==========================================================================
+# Nota: este modulo guarda y consulta usuarios, pero NO sabe nada de
+# contraseñas en claro ni de hashing — recibe el hash ya calculado desde
+# auth.py. Esa separacion es a proposito: la logica de seguridad vive en
+# un solo lugar (auth.py) y la base solo persiste.
+
+def crear_usuario(email: str, nombre: str, hash_password: str, rol: str = "usuario") -> Dict[str, Any]:
+    """Inserta un usuario nuevo. Lanza ValueError si el email ya existe."""
+    user_id = str(uuid.uuid4())
+    creado_en = datetime.now().isoformat(timespec="seconds")
+    con = _conectar()
+    try:
+        try:
+            con.execute(
+                "INSERT INTO usuarios (id, email, nombre, hash_password, rol, creado_en) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, email.lower().strip(), nombre, hash_password, rol, creado_en),
+            )
+            con.commit()
+        except sqlite3.IntegrityError:
+            raise ValueError(f"Ya existe un usuario con el email {email}")
+    finally:
+        con.close()
+    return {"id": user_id, "email": email.lower().strip(), "nombre": nombre, "rol": rol, "creado_en": creado_en}
+
+
+def obtener_usuario_por_email(email: str) -> Optional[Dict[str, Any]]:
+    """Devuelve el usuario (INCLUYE hash_password) o None. Lo usa el login."""
+    con = _conectar()
+    try:
+        fila = con.execute(
+            "SELECT id, email, nombre, hash_password, rol, creado_en FROM usuarios WHERE email = ?",
+            (email.lower().strip(),),
+        ).fetchone()
+        return dict(fila) if fila else None
+    finally:
+        con.close()
+
+
+def obtener_usuario_por_id(user_id: str) -> Optional[Dict[str, Any]]:
+    """Devuelve el usuario SIN el hash (seguro para exponer a la sesion/API)."""
+    con = _conectar()
+    try:
+        fila = con.execute(
+            "SELECT id, email, nombre, rol, creado_en FROM usuarios WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        return dict(fila) if fila else None
+    finally:
+        con.close()
+
+
+def listar_usuarios() -> List[Dict[str, Any]]:
+    """Todos los usuarios, sin hashes. Solo para el panel de admin."""
+    con = _conectar()
+    try:
+        filas = con.execute(
+            "SELECT id, email, nombre, rol, creado_en FROM usuarios ORDER BY creado_en ASC"
+        ).fetchall()
+        return [dict(f) for f in filas]
+    finally:
+        con.close()
+
+
+def cambiar_rol(user_id: str, rol: str) -> None:
+    con = _conectar()
+    try:
+        con.execute("UPDATE usuarios SET rol = ? WHERE id = ?", (rol, user_id))
+        con.commit()
+    finally:
+        con.close()
+
+
+def contar_usuarios() -> int:
+    con = _conectar()
+    try:
+        return con.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
+    finally:
+        con.close()
+
+
+def eliminar_usuario(user_id: str) -> None:
+    """Borra un usuario y TODOS sus chats/mensajes en cascada."""
+    con = _conectar()
+    try:
+        filas = con.execute("SELECT id FROM chats WHERE user_id = ?", (user_id,)).fetchall()
+        for f in filas:
+            con.execute("DELETE FROM mensajes WHERE chat_id = ?", (f["id"],))
+        con.execute("DELETE FROM chats WHERE user_id = ?", (user_id,))
+        con.execute("DELETE FROM usuarios WHERE id = ?", (user_id,))
+        con.commit()
+    finally:
+        con.close()
+
+
+def adoptar_chats_sin_usuario(user_id: str) -> int:
+    """Asigna al usuario dado todos los chats huerfanos (user_id NULL).
+
+    Sirve al migrar una base pre-multiusuario: los chats que existian antes
+    del login se le adjudican al primer admin. Devuelve cuantos adopto.
+    """
+    con = _conectar()
+    try:
+        cur = con.execute(
+            "UPDATE chats SET user_id = ? WHERE user_id IS NULL", (user_id,)
+        )
+        con.commit()
+        return cur.rowcount
+    finally:
+        con.close()
+
+
+# ==========================================================================
+# CHATS  (siempre acotados a su dueño)
+# ==========================================================================
+
+def crear_chat(user_id: str, titulo: str = "Nuevo chat") -> Dict[str, Any]:
+    """Crea un chat vacio para `user_id` y devuelve su fila (la GUI la pinta)."""
     chat_id = str(uuid.uuid4())
     creado_en = datetime.now().isoformat(timespec="seconds")
     con = _conectar()
     try:
         con.execute(
-            "INSERT INTO chats (id, titulo, creado_en) VALUES (?, ?, ?)",
-            (chat_id, titulo, creado_en),
+            "INSERT INTO chats (id, titulo, creado_en, user_id) VALUES (?, ?, ?, ?)",
+            (chat_id, titulo, creado_en, user_id),
         )
         con.commit()
     finally:
@@ -83,23 +220,38 @@ def crear_chat(titulo: str = "Nuevo chat") -> Dict[str, Any]:
     return {"id": chat_id, "titulo": titulo, "creado_en": creado_en}
 
 
-def listar_chats() -> List[Dict[str, Any]]:
+def listar_chats(user_id: str) -> List[Dict[str, Any]]:
+    """Los chats de UN usuario, mas reciente primero."""
     con = _conectar()
     try:
         filas = con.execute(
-            "SELECT id, titulo, creado_en FROM chats ORDER BY creado_en DESC"
+            "SELECT id, titulo, creado_en FROM chats WHERE user_id = ? ORDER BY creado_en DESC",
+            (user_id,),
         ).fetchall()
         return [dict(f) for f in filas]
     finally:
         con.close()
 
 
-def obtener_chat(chat_id: str) -> Optional[Dict[str, Any]]:
+def obtener_chat(chat_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Devuelve el chat, o None si no existe.
+
+    Si se pasa `user_id`, el chat solo se devuelve cuando pertenece a ese
+    usuario: asi el chequeo de propiedad es automatico en cada endpoint
+    (si un usuario pide el chat de otro, obtener_chat devuelve None -> 404).
+    Con user_id=None (contexto admin) no se filtra por dueño.
+    """
     con = _conectar()
     try:
-        fila = con.execute(
-            "SELECT id, titulo, creado_en FROM chats WHERE id = ?", (chat_id,)
-        ).fetchone()
+        if user_id is None:
+            fila = con.execute(
+                "SELECT id, titulo, creado_en FROM chats WHERE id = ?", (chat_id,)
+            ).fetchone()
+        else:
+            fila = con.execute(
+                "SELECT id, titulo, creado_en FROM chats WHERE id = ? AND user_id = ?",
+                (chat_id, user_id),
+            ).fetchone()
         return dict(fila) if fila else None
     finally:
         con.close()

@@ -619,3 +619,305 @@ body.tema-oscuro .encabezado .logo-noche {
     opacity: 0.4;
     cursor: not-allowed;
 }
+
+/* === Controles del encabezado (usuario, tema, salir) === */
+.encabezado-controles {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.usuario-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.2;
+}
+
+.usuario-nombre {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--texto);
+}
+
+.usuario-rol {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--acento-1);
+}
+
+.btn-salir {
+    background: none;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--texto);
+}
+
+.btn-salir:hover {
+    background: var(--hover);
+    border-color: var(--acento-2);
+}
+
+.btn-admin {
+    background: none;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--texto);
+}
+
+.btn-admin:hover {
+    background: var(--hover);
+    border-color: var(--acento-1);
+}
+
+/* === Pantalla de login === */
+.login-pantalla {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--fondo-app);
+    padding: 1.5rem;
+}
+
+.login-caja {
+    width: 100%;
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    padding: 2.2rem 2rem;
+    border: 1px solid var(--borde);
+    border-radius: 14px;
+    background: var(--bg-lateral);
+}
+
+.login-logo {
+    height: 52px;
+    object-fit: contain;
+    margin-bottom: 0.5rem;
+}
+
+.login-subtitulo {
+    text-align: center;
+    color: var(--texto-tenue);
+    font-size: 0.85rem;
+    margin-bottom: 1.8rem;
+}
+
+.login-label {
+    font-size: 0.82rem;
+    color: var(--texto-tenue);
+    margin-bottom: 0.35rem;
+}
+
+.login-input {
+    padding: 0.7rem 0.85rem;
+    margin-bottom: 1.1rem;
+    border: 1px solid var(--borde);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--texto);
+    font-size: 0.95rem;
+    font-family: inherit;
+}
+
+.login-input:focus {
+    outline: none;
+    border-color: var(--acento-2);
+}
+
+.login-error {
+    color: #ff6b6b;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.login-boton {
+    padding: 0.75rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--gradiente-acento);
+    color: var(--texto-sobre-acento);
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    margin-top: 0.3rem;
+}
+
+.login-boton:hover {
+    opacity: 0.9;
+}
+
+.login-boton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* === Modal de administración de usuarios === */
+.modal-fondo {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 2, 20, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 1.5rem;
+}
+
+.modal-fondo[hidden] {
+    display: none;
+}
+
+.modal-caja {
+    width: 100%;
+    max-width: 640px;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: var(--bg);
+    border: 1px solid var(--borde);
+    border-radius: 14px;
+    padding: 1.6rem;
+}
+
+.modal-titulo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.2rem;
+}
+
+.modal-titulo h2 {
+    font-size: 1.15rem;
+    color: var(--texto);
+}
+
+.modal-cerrar {
+    background: none;
+    border: none;
+    color: var(--texto-tenue);
+    font-size: 1.4rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.modal-cerrar:hover {
+    color: var(--texto);
+}
+
+.tabla-usuarios {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    margin-bottom: 1.5rem;
+}
+
+.tabla-usuarios th,
+.tabla-usuarios td {
+    text-align: left;
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px solid var(--borde);
+    color: var(--texto);
+}
+
+.tabla-usuarios th {
+    color: var(--texto-tenue);
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.tabla-usuarios .btn-borrar-usuario {
+    background: none;
+    border: none;
+    color: var(--texto-tenue);
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.tabla-usuarios .btn-borrar-usuario:hover {
+    color: #ff6b6b;
+}
+
+.badge-rol {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.badge-rol.admin {
+    background: var(--gradiente-acento);
+    color: var(--texto-sobre-acento);
+}
+
+.badge-rol.usuario {
+    border: 1px solid var(--borde);
+    color: var(--texto-tenue);
+}
+
+.form-nuevo-usuario {
+    border-top: 1px solid var(--borde);
+    padding-top: 1.2rem;
+}
+
+.form-nuevo-usuario h3 {
+    font-size: 0.95rem;
+    color: var(--texto);
+    margin-bottom: 0.8rem;
+}
+
+.form-nuevo-usuario .fila-campos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+}
+
+.form-nuevo-usuario input,
+.form-nuevo-usuario select {
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--borde);
+    border-radius: 7px;
+    background: var(--bg-lateral);
+    color: var(--texto);
+    font-size: 0.88rem;
+    font-family: inherit;
+}
+
+.form-nuevo-usuario input:focus,
+.form-nuevo-usuario select:focus {
+    outline: none;
+    border-color: var(--acento-2);
+}
+
+.form-nuevo-usuario .btn-crear-usuario {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 7px;
+    background: var(--gradiente-acento);
+    color: var(--texto-sobre-acento);
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+}
+
+.form-nuevo-usuario .btn-crear-usuario:hover {
+    opacity: 0.9;
+}
+
+.form-nuevo-usuario .error-usuario {
+    color: #ff6b6b;
+    font-size: 0.82rem;
+    margin-top: 0.6rem;
+}

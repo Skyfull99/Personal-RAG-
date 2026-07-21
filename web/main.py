@@ -15,11 +15,12 @@ que rag_service.py se vuelva a inicializar en cada recarga).
 
 from pathlib import Path
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import chat_store
+import auth
 
 # Nos aseguramos de que la base de chats exista ANTES de que cualquier
 # endpoint intente usarla.
@@ -49,11 +50,29 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.include_router(api_router, prefix="/api")
 
 
+def _hay_sesion(request: Request) -> bool:
+    """True si la cookie de sesion es valida. Solo controla que PAGINA se
+    sirve; la proteccion real de los datos vive en cada endpoint de /api.
+    """
+    token = request.cookies.get(auth.NOMBRE_COOKIE)
+    return bool(token and auth.validar_token_sesion(token))
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """Sirve la pagina principal (la GUI de chat) cuando el navegador visita http://localhost:8000/"""
+    """Pagina principal (la GUI de chat). Si no hay sesion, manda al login."""
+    if not _hay_sesion(request):
+        return RedirectResponse(url="/login", status_code=302)
     # Nota: en versiones nuevas de Starlette, TemplateResponse ya no acepta
     # el "request" metido dentro del diccionario de contexto (eso rompia con
     # un TypeError raro dentro del cache de Jinja2). Ahora va como primer
     # argumento posicional, separado del contexto.
     return templates.TemplateResponse(request, "index.html", {})
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def pagina_login(request: Request):
+    """Pantalla de inicio de sesion. Si ya hay sesion, entra directo."""
+    if _hay_sesion(request):
+        return RedirectResponse(url="/", status_code=302)
+    return templates.TemplateResponse(request, "login.html", {})

@@ -6,6 +6,7 @@ venv/
 # === Secretos y configuracion local ===
 .env
 .claude/settings.local.json
+web/.secret_key
 
 # === Datos: documentos de la empresa y bases generadas ===
 # Los documentos fuente son informacion de la empresa; la base vectorial
